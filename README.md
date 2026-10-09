@@ -4,7 +4,7 @@
 
 DataLens is an interactive web app that turns a raw CSV or Excel file into a complete data science workflow in minutes: data quality audit, one-click cleaning, exploratory analysis, accuracy of every algorithm, and a downloadable report.
 
-**Live demo:** https://datalens-sarthakiwanjari.streamlit.app
+**Live demo:** https://datalens-data-quality-and-ml-accuracy-sarthakiwanjari.streamlit.app/
 
 ## Features
 
