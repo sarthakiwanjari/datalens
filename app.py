@@ -36,7 +36,7 @@ st.set_page_config(page_title="DataLens", page_icon="🔎", layout="wide")
 # ----------------------------------------------------------------------------
 # Look & feel
 # ----------------------------------------------------------------------------
-TEAL, AMBER, CORAL, VIOLET = "#2DD4BF", "#F5B544", "#FF6B6B", "#8B7CFF"
+TEAL, AMBER, CORAL, VIOLET = "#4FA89B", "#C9A24D", "#D17572", "#8F89D1"
 st.markdown(
     """
 <style>
@@ -45,21 +45,21 @@ html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
 h1, h2, h3 { font-family: 'Sora', sans-serif !important; letter-spacing: -0.02em; }
 .block-container { padding-top: 2rem; max-width: 1300px; }
 .hero { padding: 2.2rem 2.4rem; border-radius: 22px; margin-bottom: 1.4rem;
-  background: radial-gradient(900px 300px at 85% -20%, rgba(45,212,191,.28), transparent 60%),
-              radial-gradient(700px 300px at 0% 120%, rgba(139,124,255,.25), transparent 60%), #101a2e;
+  background: radial-gradient(900px 300px at 85% -20%, rgba(79,168,155,.16), transparent 60%),
+              radial-gradient(700px 300px at 0% 120%, rgba(143,137,209,.14), transparent 60%), #101a2e;
   border: 1px solid rgba(255,255,255,.07); }
 .hero h1 { font-size: 3rem; margin: 0; font-weight: 800; }
 .hero p { color: #9fb0cc; font-size: 1.1rem; margin: .5rem 0 0 0; max-width: 46rem; }
 .score { font-family: 'Sora', sans-serif; font-size: 4rem; font-weight: 800; line-height: 1; }
 .scorelabel { color: #9fb0cc; font-size: .95rem; margin-top: .3rem; }
 .pill { display:inline-block; padding: .15rem .7rem; border-radius: 999px; font-size: .8rem;
-  background: rgba(45,212,191,.15); color: #2DD4BF; margin-right: .4rem; }
+  background: rgba(79,168,155,.12); color: #4FA89B; margin-right: .4rem; }
 [data-testid="stMetric"] { background: #131D31; border: 1px solid rgba(255,255,255,.06);
   padding: 1rem 1.2rem; border-radius: 16px; }
 [data-testid="stMetricValue"] { font-family: 'Sora', sans-serif; }
 .stTabs [data-baseweb="tab-list"] { gap: .4rem; }
 .stTabs [data-baseweb="tab"] { border-radius: 10px; padding: .5rem 1rem; background: #131D31; }
-.stTabs [aria-selected="true"] { background: rgba(45,212,191,.18) !important; }
+.stTabs [aria-selected="true"] { background: rgba(79,168,155,.14) !important; }
 .stButton > button { border-radius: 12px; font-weight: 600; }
 </style>
 """,
@@ -70,7 +70,7 @@ h1, h2, h3 { font-family: 'Sora', sans-serif !important; letter-spacing: -0.02em
 def style(fig, h=380):
     fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)", height=h, margin=dict(l=10, r=10, t=40, b=10),
-                      colorway=[TEAL, AMBER, VIOLET, CORAL, "#5EA8FF", "#B6F36B"],
+                      colorway=[TEAL, AMBER, VIOLET, CORAL, "#6F9FD8", "#9DBF6E"],
                       font=dict(family="DM Sans"))
     return fig
 
@@ -328,7 +328,7 @@ body{font-family:'DM Sans',Arial,sans-serif;margin:0;background:#f4f7fb;color:#0
 header{background:linear-gradient(120deg,#0B1220,#14325a);color:#fff;border-radius:18px;padding:28px 32px}
 header h1{margin:0 0 6px;font-size:30px}
 header p{margin:0;color:#b8c7e0}
-h2{margin:34px 0 10px;font-size:21px;border-left:5px solid #2DD4BF;padding-left:10px}
+h2{margin:34px 0 10px;font-size:21px;border-left:5px solid #4FA89B;padding-left:10px}
 .cards{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}
 .card{flex:1;min-width:150px;background:#fff;border:1px solid #e1e8f2;border-radius:14px;padding:14px 16px}
 .card b{display:block;font-size:26px}
@@ -453,6 +453,143 @@ def build_excel_report(raw, clean, log, acc, res, cl):
         if clean is not None:
             clean.to_excel(w, sheet_name="Cleaned data", index=False)
     return buf.getvalue()
+
+
+def build_pdf_report(name, raw, clean, log, acc, res, cl):
+    """One-click PDF report built with reportlab and matplotlib (no browser needed)."""
+    from matplotlib.figure import Figure
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from xml.sax.saxutils import escape as xesc
+
+    navy, accent = colors.HexColor("#14325a"), colors.HexColor("#4FA89B")
+    ss = getSampleStyleSheet()
+    body = ParagraphStyle("b", parent=ss["BodyText"], fontSize=10, leading=14)
+    small = ParagraphStyle("s", parent=body, fontSize=7.5, leading=9.5)
+    head = ParagraphStyle("hd", parent=small, textColor=colors.white, fontName="Helvetica-Bold")
+    h2 = ParagraphStyle("h2", parent=ss["Heading2"], fontSize=14, textColor=navy, spaceBefore=14, spaceAfter=6)
+    title = ParagraphStyle("t", parent=ss["Title"], fontSize=26, textColor=navy, alignment=0, spaceAfter=2)
+    W = 18 * cm
+
+    def cell(v, dec):
+        if isinstance(v, (float, np.floating)):
+            return "-" if np.isnan(v) else f"{v:,.{dec}f}"
+        return xesc(str(v))
+
+    def tbl(d, dec=3, max_rows=40):
+        d = d.head(max_rows)
+        rows = [[Paragraph(xesc(str(c)), head) for c in d.columns]]
+        rows += [[Paragraph(cell(v, dec), small) for v in r] for r in d.itertuples(index=False)]
+        t = Table(rows, colWidths=[W / len(d.columns)] * len(d.columns), repeatRows=1)
+        t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), navy),
+                               ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f1f5fa")]),
+                               ("LINEBELOW", (0, 0), (-1, -1), 0.25, colors.HexColor("#d5deea")),
+                               ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+        return t
+
+    def bars(labels, values, ttl, xlabel, color="#4FA89B", fmt="{:.1f}"):
+        h = max(2.2, 0.38 * len(labels) + 1.1)
+        fig = Figure(figsize=(8, h))
+        ax = fig.subplots()
+        ax.barh([str(x) for x in labels], values, color=color)
+        for i, v in enumerate(values):
+            ax.text(v, i, " " + fmt.format(v), va="center", fontsize=8)
+        ax.set_xlabel(xlabel)
+        ax.set_title(ttl, fontsize=11, loc="left")
+        ax.spines[["top", "right"]].set_visible(False)
+        fig.tight_layout()
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=150)
+        buf.seek(0)
+        return Image(buf, width=16 * cm, height=16 * cm * h / 8)
+
+    def footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(colors.HexColor("#6b7a90"))
+        canvas.drawString(1.5 * cm, 1 * cm, "DataLens report")
+        canvas.drawRightString(A4[0] - 1.5 * cm, 1 * cm, f"Page {doc.page}")
+        canvas.restoreState()
+
+    S = []
+    S.append(Paragraph("DataLens report", title))
+    S.append(Paragraph(f"{xesc(str(name))} | generated {datetime.now():%d %b %Y, %H:%M}", body))
+    S.append(Spacer(1, 10))
+    stats = [("Rows", f"{len(raw):,}"), ("Columns", str(raw.shape[1])),
+             ("Missing cells", f"{int(raw.isna().sum().sum()):,}"),
+             ("Duplicate rows", f"{int(raw.duplicated().sum()):,}"),
+             ("Quality score", f"{quality_score(raw)}/100")]
+    big = ParagraphStyle("big", parent=body, fontSize=16, leading=20, fontName="Helvetica-Bold", textColor=navy)
+    cards = Table([[Paragraph(v, big) for _, v in stats], [Paragraph(k, small) for k, _ in stats]],
+                  colWidths=[W / 5] * 5)
+    cards.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.6, accent),
+                               ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d5deea")),
+                               ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f1f5fa")),
+                               ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+    S.append(cards)
+
+    S.append(Paragraph("Data quality", h2))
+    miss = (raw.isna().mean() * 100).round(2)
+    miss = miss[miss > 0].sort_values()
+    if miss.empty:
+        S.append(Paragraph("No missing values found.", body))
+    else:
+        S.append(bars(list(miss.index), list(miss.values), "Missing values by column", "% missing",
+                      "#C9A24D", "{:.1f}%"))
+    nd = int(raw.duplicated().sum())
+    S.append(Paragraph(f"{nd} duplicate rows found." if nd else "No duplicate rows.", body))
+    oc = outlier_counts(raw)
+    oc = oc[oc > 0]
+    if len(oc):
+        S.append(Spacer(1, 6))
+        S.append(Paragraph("Outliers by the IQR rule:", body))
+        S.append(tbl(oc.rename("Outlier rows").rename_axis("Column").reset_index(), 0))
+    S.append(Paragraph("Columns", h2))
+    S.append(tbl(pd.DataFrame({"Column": raw.columns, "Type": raw.dtypes.astype(str).values,
+                               "Unique": raw.nunique().values,
+                               "Missing %": (raw.isna().mean() * 100).round(2).values}), 2, 60))
+
+    S.append(Paragraph("Cleaning", h2))
+    if clean is not None and log:
+        for x in log:
+            S.append(Paragraph("- " + xesc(x), body))
+        S.append(Paragraph(f"Rows {len(raw):,} to {len(clean):,}. Quality score {quality_score(raw)} "
+                           f"to <b>{quality_score(clean)}</b>.", body))
+    else:
+        S.append(Paragraph("Cleaning was not run for this report.", body))
+
+    if acc:
+        sup, knn, clus, atask = acc
+        word = "accuracy" if atask == "Classification" else "R2 score"
+        S.append(Paragraph("Accuracy of every algorithm", h2))
+        S.append(Paragraph(f"Best algorithm: <b>{xesc(str(sup.iloc[0]['Algorithm']))}</b> with "
+                           f"<b>{sup.iloc[0]['Test %']:.1f}%</b> test {word} ({atask.lower()}).", body))
+        s2 = sup.iloc[::-1]
+        S.append(bars(list(s2["Algorithm"]), list(s2["Test %"]), f"Test {word} by algorithm (%)",
+                      "%"))
+        S.append(tbl(sup, 1))
+        if knn["CV %"].notna().any():
+            kb = knn.loc[knn["CV %"].idxmax()]
+            S.append(Spacer(1, 6))
+            S.append(Paragraph(f"Best KNN setting: k = {int(kb['k'])} ({kb['CV %']:.1f}% cross-validated).", body))
+        if clus is not None:
+            S.append(Paragraph("Clustering scores", h2))
+            S.append(tbl(clus, 3))
+    if res is not None:
+        S.append(Paragraph("Model comparison", h2))
+        S.append(tbl(res, 3))
+    if cl is not None:
+        S.append(Paragraph("Clustering run", h2))
+        S.append(tbl(cl, 3))
+
+    out = io.BytesIO()
+    SimpleDocTemplate(out, pagesize=A4, leftMargin=1.5 * cm, rightMargin=1.5 * cm, topMargin=1.5 * cm,
+                      bottomMargin=1.8 * cm, title="DataLens report").build(
+        S, onFirstPage=footer, onLaterPages=footer)
+    return out.getvalue()
 
 
 # ----------------------------------------------------------------------------
@@ -814,18 +951,21 @@ with tab_rep:
         st.markdown(f"{'✅' if ok else '⬜'} {label}" + ("" if ok else " (not run yet)"))
     if st.button("Build report", type="primary"):
         with st.spinner("Building report..."):
-            nm = src_id[0]
-            st.session_state.report = (
-                build_html_report(nm, raw, df, st.session_state.get("log"), acc_r,
-                                  mod_r[0] if mod_r else None, clu_r[0] if clu_r else None),
-                build_excel_report(raw, df, st.session_state.get("log"), acc_r,
-                                   mod_r[0] if mod_r else None, clu_r[0] if clu_r else None))
+            nm, lg = src_id[0], st.session_state.get("log")
+            args = (raw, df, lg, acc_r, mod_r[0] if mod_r else None, clu_r[0] if clu_r else None)
+            try:
+                pdf = build_pdf_report(nm, *args)
+            except Exception as e:
+                pdf = None
+                st.warning(f"The PDF could not be built ({e}). The HTML and Excel reports still work.")
+            st.session_state.report = (build_html_report(nm, *args), build_excel_report(*args), pdf)
     if st.session_state.get("report"):
-        html_doc, xlsx = st.session_state.report
-        d1, d2 = st.columns(2)
-        d1.download_button("Download HTML report", html_doc.encode("utf-8"), "datalens_report.html",
+        html_doc, xlsx, pdf = st.session_state.report
+        d1, d2, d3 = st.columns(3)
+        d1.download_button("Download PDF report", pdf or b"", "datalens_report.pdf", "application/pdf",
+                           width="stretch", type="primary", disabled=pdf is None)
+        d2.download_button("Download HTML report", html_doc.encode("utf-8"), "datalens_report.html",
                            "text/html", width="stretch")
-        d2.download_button("Download Excel report", xlsx, "datalens_report.xlsx",
+        d3.download_button("Download Excel report", xlsx, "datalens_report.xlsx",
                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                            width="stretch")
-        st.caption("For a PDF, open the HTML file in your browser, press Ctrl+P and choose Save as PDF.")
